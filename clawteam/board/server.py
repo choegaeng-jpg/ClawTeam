@@ -8,8 +8,8 @@ import time
 import urllib.request
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from urllib.parse import parse_qs, unquote, urlparse
 
 from clawteam.board.collector import BoardCollector
 
@@ -47,6 +47,18 @@ class BoardHandler(BaseHTTPRequestHandler):
     default_team: str = ""
     interval: float = 2.0
     team_cache: TeamSnapshotCache
+
+    @staticmethod
+    def _is_safe_team_name(team_name: str) -> bool:
+        if not team_name:
+            return False
+        if "/" in team_name or "\\" in team_name:
+            return False
+        if team_name in {".", ".."}:
+            return False
+        if PurePosixPath(team_name).is_absolute() or PureWindowsPath(team_name).is_absolute():
+            return False
+        return True
 
     def do_GET(self):
         path = self.path.split("?")[0]
@@ -105,7 +117,10 @@ class BoardHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/team/") and path.endswith("/task"):
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[3] == "task":
-                team_name = parts[2]
+                team_name = unquote(parts[2])
+                if not self._is_safe_team_name(team_name):
+                    self.send_error(404)
+                    return
                 content_length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_length).decode("utf-8")
                 try:
