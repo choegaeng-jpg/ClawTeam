@@ -211,25 +211,24 @@ class BoardHandler(BaseHTTPRequestHandler):
 
                 # For unknown-length/chunked upstream responses, fully validate
                 # size before sending downstream headers so oversized payloads
-                # always return a deterministic 413 status.
-                buffered_chunks: list[bytes] = []
-                total = 0
+                # always return a deterministic 413 status. We intentionally
+                # avoid writing to wfile before the size check finishes.
+                buffered_body = bytearray()
                 while True:
                     chunk = resp.read(self.proxy_chunk_size)
                     if not chunk:
                         break
-                    total += len(chunk)
-                    if total > self.proxy_max_bytes:
+                    buffered_body.extend(chunk)
+                    if len(buffered_body) > self.proxy_max_bytes:
                         self.send_error(413, "Response too large")
                         return
-                    buffered_chunks.append(chunk)
 
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Length", str(len(buffered_body)))
                 self.end_headers()
-                for chunk in buffered_chunks:
-                    self.wfile.write(chunk)
+                self.wfile.write(buffered_body)
         except TimeoutError:
             self.send_error(504, "Proxy request timed out")
         except socket.timeout:
