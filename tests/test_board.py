@@ -416,3 +416,37 @@ def test_do_post_decodes_urlencoded_team_name(monkeypatch):
     assert captured["team_name"] == "demo team"
     assert served["data"] == {"status": "ok", "task_id": "task-encoded"}
     assert errors == []
+
+
+def test_do_post_rejects_decoded_path_separator_team_name(monkeypatch):
+    class FakeTaskStore:
+        def __init__(self, team_name: str):
+            raise AssertionError("TaskStore should not be instantiated for unsafe team names")
+
+    monkeypatch.setattr("clawteam.team.tasks.TaskStore", FakeTaskStore)
+    handler, served, errors = _make_post_handler(
+        "/api/team/%2Ftmp/task",
+        payload=json.dumps({"subject": "encoded"}),
+    )
+
+    handler.do_POST()
+
+    assert "data" not in served
+    assert errors == [(404, None)]
+
+
+def test_do_post_rejects_parent_path_like_team_name(monkeypatch):
+    class FakeTaskStore:
+        def __init__(self, team_name: str):
+            raise AssertionError("TaskStore should not be instantiated for unsafe team names")
+
+    monkeypatch.setattr("clawteam.team.tasks.TaskStore", FakeTaskStore)
+    handler, served, errors = _make_post_handler(
+        "/api/team/..%2Fsecret/task",
+        payload=json.dumps({"subject": "encoded"}),
+    )
+
+    handler.do_POST()
+
+    assert "data" not in served
+    assert errors == [(404, None)]
