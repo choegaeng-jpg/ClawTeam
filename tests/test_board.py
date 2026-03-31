@@ -4,8 +4,10 @@ import io
 import json
 from pathlib import Path
 
+import pytest
+
 from clawteam.board.collector import BoardCollector
-from clawteam.board.server import BoardHandler
+from clawteam.board.server import BoardHandler, _fetch_proxy_content, _normalize_proxy_target
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.manager import TeamManager
 
@@ -461,6 +463,23 @@ def test_do_post_rejects_decoded_team_name_with_traversal_component(monkeypatch)
     monkeypatch.setattr("clawteam.team.tasks.TaskStore", FakeTaskStore)
     handler, served, errors = _make_post_handler(
         "/api/team/%2E%2E/task",
+        payload=json.dumps({"subject": "encoded"}),
+    )
+
+    handler.do_POST()
+
+    assert "data" not in served
+    assert errors == [(404, None)]
+
+
+def test_do_post_rejects_decoded_team_name_dot_segment(monkeypatch):
+    class FakeTaskStore:
+        def __init__(self, team_name: str):
+            raise AssertionError("TaskStore should not be instantiated for unsafe team names")
+
+    monkeypatch.setattr("clawteam.team.tasks.TaskStore", FakeTaskStore)
+    handler, served, errors = _make_post_handler(
+        "/api/team/%2E/task",
         payload=json.dumps({"subject": "encoded"}),
     )
 
