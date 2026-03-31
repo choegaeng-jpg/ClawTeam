@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import ntpath
 import threading
 import time
 import urllib.request
@@ -55,6 +56,9 @@ class BoardHandler(BaseHTTPRequestHandler):
         if team_name.startswith("/") or "\\" in team_name or "/" in team_name:
             return False
         if team_name in {".", ".."}:
+            return False
+        drive, _ = ntpath.splitdrive(team_name)
+        if drive:
             return False
         return True
 

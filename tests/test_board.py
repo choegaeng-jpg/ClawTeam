@@ -435,6 +435,23 @@ def test_do_post_rejects_urlencoded_path_separator_in_team_name(monkeypatch):
     assert errors == [(404, None)]
 
 
+def test_do_post_rejects_drive_qualified_team_name(monkeypatch):
+    class FakeTaskStore:
+        def __init__(self, team_name: str):
+            raise AssertionError("TaskStore should not be instantiated for drive-qualified team names")
+
+    monkeypatch.setattr("clawteam.team.tasks.TaskStore", FakeTaskStore)
+    handler, served, errors = _make_post_handler(
+        "/api/team/D%3Aevil/task",
+        payload=json.dumps({"subject": "unsafe"}),
+    )
+
+    handler.do_POST()
+
+    assert "data" not in served
+    assert errors == [(404, None)]
+
+
 def test_do_post_rejects_traversal_team_name(monkeypatch):
     class FakeTaskStore:
         def __init__(self, team_name: str):
