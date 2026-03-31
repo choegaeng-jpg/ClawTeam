@@ -344,7 +344,7 @@ def test_serve_proxy_returns_413_for_oversized_content_length(monkeypatch):
     assert captured["error"] == (413, "Response too large")
 
 
-def test_serve_proxy_streams_chunks_without_content_length(monkeypatch):
+def test_serve_proxy_buffers_chunked_response_and_sets_content_length(monkeypatch):
     handler = object.__new__(BoardHandler)
     handler.proxy_timeout_seconds = 1
     handler.proxy_max_bytes = 4096
@@ -380,7 +380,7 @@ def test_serve_proxy_streams_chunks_without_content_length(monkeypatch):
     handler._serve_proxy("https://example.com/chunked.txt")
 
     assert status["code"] == 200
-    assert ("Content-Length", "6") not in headers
+    assert ("Content-Length", "6") in headers
     assert handler.wfile.getvalue() == b"abcdef"
 
 
