@@ -196,13 +196,23 @@ class BoardHandler(BaseHTTPRequestHandler):
                 else:
                     content_length = None
 
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Access-Control-Allow-Origin", "*")
                 if content_length is not None:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Access-Control-Allow-Origin", "*")
                     self.send_header("Content-Length", str(content_length))
-                self.end_headers()
+                    self.end_headers()
+                    while True:
+                        chunk = resp.read(self.proxy_chunk_size)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                    return
 
+                # For unknown-length/chunked upstream responses, fully validate
+                # size before sending downstream headers so oversized payloads
+                # always return a deterministic 413 status.
+                buffered_chunks: list[bytes] = []
                 total = 0
                 while True:
                     chunk = resp.read(self.proxy_chunk_size)
@@ -212,6 +222,13 @@ class BoardHandler(BaseHTTPRequestHandler):
                     if total > self.proxy_max_bytes:
                         self.send_error(413, "Response too large")
                         return
+                    buffered_chunks.append(chunk)
+
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                for chunk in buffered_chunks:
                     self.wfile.write(chunk)
         except TimeoutError:
             self.send_error(504, "Proxy request timed out")
