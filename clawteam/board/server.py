@@ -106,7 +106,7 @@ class BoardHandler(BaseHTTPRequestHandler):
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[3] == "task":
                 team_name = unquote(parts[2])
-                if not team_name:
+                if not self._is_valid_post_team_name(team_name):
                     self.send_error(404)
                     return
                 content_length = int(self.headers.get("Content-Length", 0))
@@ -125,6 +125,20 @@ class BoardHandler(BaseHTTPRequestHandler):
                     self.send_error(400, str(e))
                 return
         self.send_error(404)
+
+    @staticmethod
+    def _is_valid_post_team_name(team_name: str) -> bool:
+        if not team_name:
+            return False
+        if "/" in team_name or "\\" in team_name:
+            return False
+        if team_name in {".", ".."}:
+            return False
+        if team_name.startswith(".."):
+            return False
+        if ":" in team_name:
+            return False
+        return True
 
     def _serve_static(self, filename: str, content_type: str):
         filepath = _STATIC_DIR / filename
